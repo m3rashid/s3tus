@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/joho/godotenv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,7 +23,6 @@ func main() {
 		panic(err)
 	}
 
-	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	uploadPath, err := filepath.Abs("uploads")
 	if err != nil {
 		panic(fmt.Errorf("unable to get absolute path for uploads directory: %s", err))
@@ -65,6 +62,14 @@ func main() {
 		}
 	}()
 
-	app.Use(UPLOAD_BASE_PATH, adaptor.HTTPHandler(http.StripPrefix(UPLOAD_BASE_PATH, handler)))
-	app.Listen(":5000")
+	// Fiber Not working
+	// app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	// app.Use(UPLOAD_BASE_PATH, adaptor.HTTPHandler(http.StripPrefix(UPLOAD_BASE_PATH, handler)))
+	// app.Listen(":5000")
+
+	// Standard library also not working, LOL
+	http.Handle(UPLOAD_BASE_PATH, http.StripPrefix(UPLOAD_BASE_PATH, handler))
+	if err = http.ListenAndServe(":5000", nil); err != nil {
+		panic(fmt.Errorf("unable to listen: %s", err))
+	}
 }
