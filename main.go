@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/joho/godotenv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -23,24 +24,14 @@ func main() {
 		panic(err)
 	}
 
-	uploadPath, err := filepath.Abs("uploads")
-	if err != nil {
-		panic(fmt.Errorf("unable to get absolute path for uploads directory: %s", err))
-	}
-
-	store := s3store.S3Store{
-		Bucket:             os.Getenv("AWS_S3_BUCKET_NAME"),
-		TemporaryDirectory: uploadPath,
-		MaxObjectSize:      MAX_UPLAOD_SIZE,
-		Service: s3.New(s3.Options{
-			Region: os.Getenv("AWS_REGION"),
-			Credentials: aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
-				os.Getenv("AWS_ACCESS_KEY_ID"),
-				os.Getenv("AWS_SECRET_ACCESS_KEY"),
-				"",
-			)),
-		}),
-	}
+	store := s3store.New(os.Getenv("AWS_S3_BUCKET_NAME"), s3.New(s3.Options{
+		Region: os.Getenv("AWS_REGION"),
+		Credentials: aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
+			os.Getenv("AWS_ACCESS_KEY_ID"),
+			os.Getenv("AWS_SECRET_ACCESS_KEY"),
+			"",
+		)),
+	}))
 
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
@@ -62,14 +53,7 @@ func main() {
 		}
 	}()
 
-	// Fiber Not working
-	// app := fiber.New(fiber.Config{DisableStartupMessage: true})
-	// app.Use(UPLOAD_BASE_PATH, adaptor.HTTPHandler(http.StripPrefix(UPLOAD_BASE_PATH, handler)))
-	// app.Listen(":5000")
-
-	// Standard library also not working, LOL
-	http.Handle(UPLOAD_BASE_PATH, http.StripPrefix(UPLOAD_BASE_PATH, handler))
-	if err = http.ListenAndServe(":5000", nil); err != nil {
-		panic(fmt.Errorf("unable to listen: %s", err))
-	}
+	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app.Use(UPLOAD_BASE_PATH, adaptor.HTTPHandler(http.StripPrefix(UPLOAD_BASE_PATH, handler)))
+	app.Listen(":5000")
 }
