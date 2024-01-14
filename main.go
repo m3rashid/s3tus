@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -76,14 +78,40 @@ func main() {
 	}()
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000",
+		AllowCredentials: true,
+	}))
+
 	app.Use(UPLOAD_BASE_PATH, adaptor.HTTPHandler(http.StripPrefix(UPLOAD_BASE_PATH, handler)))
+
+	app.Get("/auth", func(c *fiber.Ctx) error {
+		c.Cookie(&fiber.Cookie{
+			Name:  "auth",
+			Value: "test",
+			// Domain:   "http://localhost:3000",
+			HTTPOnly: true,
+		})
+		return c.SendStatus(fiber.StatusOK)
+	})
+
 	app.Get("/file/:id", func(c *fiber.Ctx) error {
 		id := c.Params("id")
+		// get the auth cookie
+		authCookie := c.Cookies("auth", "")
+		fmt.Println("======= Auth cookie =============> ", authCookie, "  <==")
+
+		if authCookie == "" || authCookie != "test" {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+
 		url, err := getPreSignedUrl(id)
 		if err != nil {
 			return err
 		}
 		return c.Redirect(url, http.StatusTemporaryRedirect)
 	})
+
+	log.Println("Server is running ...")
 	app.Listen(":5000")
 }
