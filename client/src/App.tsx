@@ -21,7 +21,21 @@ function App() {
     }
   }, []);
 
-  return <div id='uppy-dashboard' ref={appRef} />;
+  return (
+    <>
+      <img
+        height={500}
+        src='http://localhost:5000/file/d346bbee91bc6dd98d93e2563113275c'
+        // src='https://s3.ap-south-1.amazonaws.com/go.awesome.stack/d346bbee91bc6dd98d93e2563113275c'
+      />
+      {/* <video
+        controls
+        height={500}
+        src='http://localhost:5000/file/40b011750f6893fb772ff68844997e2b'
+      /> */}
+      <div id='uppy-dashboard' ref={appRef} />
+    </>
+  );
 }
 
 export default App;

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,31 +20,52 @@ import (
 const UPLOAD_BASE_PATH = "/files/"
 const MAX_UPLAOD_SIZE = 500 * 1024 * 1024 // 500 MB
 
-func main() {
-	if err := godotenv.Load(".env"); err != nil {
-		panic(err)
-	}
-
-	store := s3store.New(os.Getenv("AWS_S3_BUCKET_NAME"), s3.New(s3.Options{
+func getS3Client() *s3.Client {
+	return s3.New(s3.Options{
 		Region: os.Getenv("AWS_REGION"),
 		Credentials: aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
 			os.Getenv("AWS_ACCESS_KEY_ID"),
 			os.Getenv("AWS_SECRET_ACCESS_KEY"),
 			"",
 		)),
-	}))
+	})
+}
 
+func getTusHandler() (*tusd.Handler, error) {
+	store := s3store.New(os.Getenv("AWS_S3_BUCKET_NAME"), getS3Client())
 	composer := tusd.NewStoreComposer()
 	store.UseIn(composer)
 
-	handler, err := tusd.NewHandler(tusd.Config{
+	return tusd.NewHandler(tusd.Config{
 		BasePath:              UPLOAD_BASE_PATH,
 		StoreComposer:         composer,
 		NotifyCompleteUploads: true,
 	})
+}
+
+func getPreSignedUrl(imageId string) (string, error) {
+	s3Client := getS3Client()
+	presigner := s3.NewPresignClient(s3Client)
+	req, err := presigner.PresignGetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(os.Getenv("AWS_S3_BUCKET_NAME")),
+		Key:    &imageId,
+	})
 
 	if err != nil {
-		panic(fmt.Errorf("unable to create handler: %s", err))
+		return "", err
+	}
+
+	return req.URL, nil
+}
+
+func main() {
+	if err := godotenv.Load(".env"); err != nil {
+		panic(err)
+	}
+
+	handler, err := getTusHandler()
+	if err != nil {
+		panic(err)
 	}
 
 	go func() {
@@ -55,5 +77,13 @@ func main() {
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(UPLOAD_BASE_PATH, adaptor.HTTPHandler(http.StripPrefix(UPLOAD_BASE_PATH, handler)))
+	app.Get("/file/:id", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		url, err := getPreSignedUrl(id)
+		if err != nil {
+			return err
+		}
+		return c.Redirect(url, http.StatusTemporaryRedirect)
+	})
 	app.Listen(":5000")
 }
