@@ -87,9 +87,8 @@ func main() {
 
 	app.Get("/auth", func(c *fiber.Ctx) error {
 		c.Cookie(&fiber.Cookie{
-			Name:  "auth",
-			Value: "test",
-			// Domain:   "http://localhost:3000",
+			Name:     "auth",
+			Value:    "test",
 			HTTPOnly: true,
 		})
 		return c.SendStatus(fiber.StatusOK)
@@ -97,7 +96,7 @@ func main() {
 
 	app.Get("/file/:id", func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		// get the auth cookie
+		// get the auth
 		authCookie := c.Cookies("auth", "")
 		fmt.Println("======= Auth cookie =============> ", authCookie, "  <==")
 
